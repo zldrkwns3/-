@@ -6,16 +6,17 @@ import axios from 'axios';
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // KIS API 초당 호출 제한을 피하기 위한 글로벌 쓰로틀링 (초당 2건 미만)
-let lastKisCallTime = 0;
+let nextAvailableTime = Date.now();
 const KIS_MIN_INTERVAL = 600; // 0.6초 (안전 마진 확보)
 
 async function throttleKis() {
     const now = Date.now();
-    const elapsed = now - lastKisCallTime;
-    if (elapsed < KIS_MIN_INTERVAL) {
-        await new Promise(resolve => setTimeout(resolve, KIS_MIN_INTERVAL - elapsed));
+    const targetTime = Math.max(now, nextAvailableTime);
+    nextAvailableTime = targetTime + KIS_MIN_INTERVAL;
+    
+    if (targetTime > now) {
+        await new Promise(resolve => setTimeout(resolve, targetTime - now));
     }
-    lastKisCallTime = Date.now();
 }
 
 const getAccNo = () => {
@@ -158,12 +159,13 @@ export const getKisPrice = async (symbol: string, retryCount = 0): Promise<any> 
       marketCap: parseInt(output.hts_avls, 10) * 1000000 // 백만 단위 -> 원 단위
     };
   } catch (err: any) {
-     if (err.response?.status === 429 && retryCount < 3) {
-        console.warn(`[KIS API] 429 Rate Limit on getKisPrice(${symbol}). Retrying in 500ms... (${retryCount + 1}/3)`);
-        await delay(500);
+     const errMsg = err.response?.data?.msg1 || err.message || "알 수 없는 오류";
+     if ((err.response?.status === 429 || errMsg.includes("초당 거래건수")) && retryCount < 3) {
+        console.warn(`[KIS API] Rate Limit on getKisPrice(${symbol}). Retrying in 1s... (${retryCount + 1}/3)`);
+        await delay(1000);
         return getKisPrice(symbol, retryCount + 1);
      }
-     // console.error("GetPrice Error:", err.response?.data || err.message);
+     console.error(`[KIS API] GetPrice Error for ${symbol}: ${errMsg}`);
      return null;
   }
 };
@@ -258,12 +260,14 @@ export const getKisBalance = async (retryCount = 0): Promise<any> => {
             isVts: getIsVts()
         };
     } catch (err: any) {
-        if (err.response?.status === 429 && retryCount < 3) {
-            console.warn(`[KIS API] 429 Rate Limit on getKisBalance(). Retrying in 500ms... (${retryCount + 1}/3)`);
-            await delay(500);
+        const errMsg = err.response?.data?.msg1 || err.message || "서버 통신 오류";
+
+        if ((err.response?.status === 429 || errMsg.includes("초당 거래건수")) && retryCount < 3) {
+            console.warn(`[KIS API] Rate Limit on getKisBalance(). Retrying in 1s... (${retryCount + 1}/3)`);
+            await delay(1000);
             return getKisBalance(retryCount + 1);
         }
-        const errMsg = err.response?.data?.msg1 || err.message || "서버 통신 오류";
+        
         console.error(`[KIS API] critical error: ${errMsg}`);
         return { 
             error: errMsg,

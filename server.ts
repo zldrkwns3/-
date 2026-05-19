@@ -471,10 +471,12 @@ const aiSellCache = new Map<string, { lastChecked: number, sellRecommended: bool
 async function askGeminiForSell(
   symbol: string,
   stockName: string, 
+  currentPrice: number,
   currentProfitPct: number, 
   holdingTimeMinutes: number,
   aiTriggerReason: string,
-  dropFromHighPct: number = 0
+  dropFromHighPct: number = 0,
+  indicators: any = null
 ): Promise<{ recommended: boolean, reason: string, confidence: number }> {
    const apiKey = process.env.GEMINI_API_KEY;
    if (!apiKey || apiKey.length < 10) return { recommended: false, reason: "API Key missing", confidence: 0 };
@@ -500,6 +502,12 @@ async function askGeminiForSell(
    try {
      addBotLog(`🤖 AI에게 '${stockName}' 조기 매도 판단 요청 중... (수익률: ${currentProfitPct.toFixed(2)}%)`);
      
+     const indicatorsText = indicators ? `
+[기술적 지표 및 모멘텀]
+- 거래량 폭증 비율 (현재/5일평균): ${indicators.volumeRatio ? indicators.volumeRatio.toFixed(2) : 1}배
+- 전일 고가 돌파/이탈 여부: ${indicators.yesterdayHigh ? (currentPrice < indicators.yesterdayHigh ? '전일 고가 하향 이탈 (매도 압력 우세)' : '전일 고가 지지 중') : '알 수 없음'}
+- 현재가: ${currentPrice} (전일 고가: ${indicators.yesterdayHigh})` : '';
+
      const prompt = `
 당신은 한국 주식 단타(데이 트레이딩) 최고 전문가입니다.
 현재 봇이 보유 중인 '${stockName}(${symbol})'의 '조기 청산(매도)' 여부를 결정해야 합니다.
@@ -509,7 +517,7 @@ async function askGeminiForSell(
 - 종목명: ${stockName}
 - 현재 수익률: ${currentProfitPct.toFixed(2)}%
 - 보유 시간: ${holdingTimeMinutes}분
-- 최고점 대비 하락률 (변동성 지표): ${dropFromHighPct.toFixed(2)}%
+- 최고점 대비 하락률 (변동성 지표): ${dropFromHighPct.toFixed(2)}%${indicatorsText}
 
 [매도 판단 검사 발동 사유]
 - ${aiTriggerReason}
@@ -556,17 +564,47 @@ async function askGeminiForSell(
      }
      
      let recommended = parsed.sell_recommended === true;
-     const confidence = parsed.confidence_score || 0;
+     let confidence = parsed.confidence_score || 0;
      let reason = parsed.reason || "이유 불명";
+
+     // volumeRatio 및 yesterdayHigh 지표에 따른 확신도 보정 로직
+     if (indicators) {
+        // 1. 거래량이 크게 터지면서 고점 대비 많이 하락 => 강한 투매 신호 (추세 역전 우려)
+        if (indicators.volumeRatio && indicators.volumeRatio > 1.5 && dropFromHighPct >= 2.0) {
+            confidence += 20;
+            if (!recommended) { 
+                recommended = true; 
+                reason = "(보정: 대량 거래 수반 고점 이탈 투매 징후 - 매도 승인) " + reason; 
+            }
+        }
+        // 2. 거래량이 소외될 정도로 매마를 경우 단기 모멘텀 이탈 위험
+        else if (indicators.volumeRatio && indicators.volumeRatio < 0.5) {
+            confidence += 10; 
+        }
+
+        if (indicators.yesterdayHigh) {
+            if (currentPrice < indicators.yesterdayHigh) {
+                // 전일 고가를 이탈한 상태에서 하락폭이 커지면 위험성 가중
+                confidence += 15; 
+                if (dropFromHighPct >= 1.5 && confidence >= 60 && !recommended) {
+                    recommended = true;
+                    reason = "(보정: 전일 고가 이탈 및 낙폭 확대 - 매도 승인) " + reason;
+                }
+            } else if (currentPrice >= indicators.yesterdayHigh * 1.01 && dropFromHighPct < 1.5) {
+                // 전일 고가 위에서 강력히 지지될 경우 섣부른 익절 방지
+                confidence -= 15;
+            }
+        }
+     }
 
      // 신뢰도 점수(confidence_score)와 변동성(dropFromHighPct)을 결합한 매도 로직
      if (recommended) {
          if (confidence < 70) {
-             if (dropFromHighPct >= 2.0) {
-                 reason = `(확신도 낮음:${confidence} - 하지만 변동성 위험으로 강제 승인) ` + reason;
+             if (dropFromHighPct >= 2.0 || (indicators?.yesterdayHigh && currentPrice < indicators.yesterdayHigh)) {
+                 reason = `(확신도 미달:${confidence} - 하지만 변동성/저항선 위험으로 승인) ` + reason;
              } else {
                  recommended = false;
-                 reason = `(매도 취소: 확신도 ${confidence}점 미달, 변동성 안정적) ` + reason;
+                 reason = `(매도 취소: 확신도 ${confidence}점 미달, 현재 상태 양호) ` + reason;
              }
          } else {
              reason = `(신뢰도 ${confidence}점) ` + reason;
@@ -986,7 +1024,8 @@ async function monitoringLoop() {
              // addBotLog(`\n🔍 [AI 스마트 매도 검사 발동] 종목: ${config.name}`);
              // addBotLog(`👉 발동 사유: ${aiTriggerReason} | 현재 수익률: ${(profitRate * 100).toFixed(2)}%`);
              
-             const aiSell = await askGeminiForSell(symbol, stock.name, profitRate * 100, holdTimeMinutes, aiTriggerReason, dropFromHigh * 100);
+             const indicators = await getTechnicalIndicators(symbol, currentPrice);
+             const aiSell = await askGeminiForSell(symbol, stock.name, currentPrice, profitRate * 100, holdTimeMinutes, aiTriggerReason, dropFromHigh * 100, indicators);
              if (aiSell.recommended) {
                 addBotLog(`🤖 🚨 AI가 조기 매도 지시! 즉시 시장가 청산을 진행합니다. (사유: ${aiTriggerReason})`);
                 const order = await sellOrder(symbol, currentPrice.toString(), position.qty.toString());
