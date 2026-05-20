@@ -153,10 +153,14 @@ export const getKisPrice = async (symbol: string, retryCount = 0): Promise<any> 
     const output = res.data.output;
     if (!output) return null;
 
+    const price = parseInt(output.stck_prpr, 10) || 0;
+    const high52Week = parseInt(output.stck_dryy_hgpr, 10) || price;
     return {
       name: output.hts_kor_isnm,
-      price: parseInt(output.stck_prpr, 10),
-      marketCap: parseInt(output.hts_avls, 10) * 1000000 // 백만 단위 -> 원 단위
+      price,
+      marketCap: parseInt(output.hts_avls, 10) * 100000000, // 억원 단위 → 원
+      high52Week,
+      dayChangeRate: parseFloat(output.prdy_ctrt) || 0
     };
   } catch (err: any) {
      const errMsg = err.response?.data?.msg1 || err.message || "알 수 없는 오류";
@@ -220,10 +224,10 @@ export const getKisBalance = async (retryCount = 0): Promise<any> => {
             let totalEquity = 0;
             if (res.data.output2 && res.data.output2.length > 0) {
                 const d2Balance = res.data.output2[0].prvs_rcdl_excc_amt;
-                if (d2Balance) balance = parseInt(d2Balance, 10);
-                else balance = parseInt(res.data.output2[0].dnca_tot_amt, 10);
-                
-                totalEquity = parseInt(res.data.output2[0].tot_evlu_amt || "0", 10);
+                if (d2Balance) balance = parseInt(d2Balance, 10) || 0;
+                else balance = parseInt(res.data.output2[0].dnca_tot_amt, 10) || 0;
+
+                totalEquity = parseInt(res.data.output2[0].tot_evlu_amt || "0", 10) || 0;
             }
             
             const positionItems = res.data.output1 || [];
@@ -350,30 +354,39 @@ async function fetchTop100ByVolume(): Promise<{symbol: string}[]> {
       },
       params: {
         "fid_cond_mrkt_div_code": "J",
-        "fid_cond_scrn_id": "1102",
+        "fid_cond_scrn_id": "20171",      // fix: 1102 → 20171 (KIS 거래량순위 표준 스크린ID)
         "fid_input_iscd": "0000",
         "fid_div_cls_code": "0",
-        "fid_sort_cntg_id": "1" // 거래량 순
+        "fid_blng_cls_code": "0",
+        "fid_trgt_cls_code": "111111111",
+        "fid_trgt_exls_cls_code": "000000",
+        "fid_input_price_1": "",
+        "fid_input_price_2": "",
+        "fid_vol_cnt": "",
+        "fid_input_date_1": ""
       }
     });
 
-    if (res.data.rt_cd === '0' && res.data.output) {
+    if (res.data.rt_cd === '0' && res.data.output && res.data.output.length > 0) {
+      console.log(`📋 [거래량 순위] API 성공: ${res.data.output.length}개 종목 수신`);
       return res.data.output.slice(0, 100).map((item: any) => ({
         symbol: item.mksc_shrn_iscd
       }));
     }
-  } catch (e) {
-    console.error("Top volume API error:", e);
+    console.warn(`[거래량 순위 API] 응답 이상: rt_cd=${res.data.rt_cd}, msg=${res.data.msg1}`);
+  } catch (e: any) {
+    console.error("Top volume API error:", e.response?.data?.msg1 || e.message);
   }
-  // 실패 시 기본 우량주 풀 반환
+  // 실패 시 시총 1천억~2조 중형주 폴백 (대형주 사용 시 시총 필터 전부 탈락)
+  console.warn("⚠️ [폴백] 거래량 순위 API 실패 → 중형주 기본 풀 사용");
   return [
-    { symbol: "005930" }, { symbol: "000660" }, { symbol: "373220" },
-    { symbol: "207940" }, { symbol: "005380" }, { symbol: "000270" },
-    { symbol: "068270" }, { symbol: "051910" }, { symbol: "005490" },
-    { symbol: "035420" }, { symbol: "035720" }, { symbol: "006400" },
-    { symbol: "012330" }, { symbol: "105560" }, { symbol: "055550" },
-    { symbol: "032830" }, { symbol: "003670" }, { symbol: "033780" },
-    { symbol: "011200" }
+    { symbol: "011200" }, { symbol: "000860" }, { symbol: "034020" },
+    { symbol: "047040" }, { symbol: "073240" }, { symbol: "088790" },
+    { symbol: "064350" }, { symbol: "054000" }, { symbol: "030000" },
+    { symbol: "034120" }, { symbol: "105630" }, { symbol: "001230" },
+    { symbol: "024720" }, { symbol: "006360" }, { symbol: "038530" },
+    { symbol: "025620" }, { symbol: "204320" }, { symbol: "060980" },
+    { symbol: "003410" }, { symbol: "095570" },
   ];
 }
 
@@ -381,16 +394,17 @@ async function fetchTop100ByVolume(): Promise<{symbol: string}[]> {
 async function fetchStockDetail(symbol: string): Promise<any> {
   const kisData = await getKisPrice(symbol);
   
+  const currentPrice = kisData?.price || 10000;
   return {
-    symbol: symbol,
+    symbol,
     name: kisData?.name || symbol,
-    isWarning: false, 
+    isWarning: false,
     isAdmin: false,
     isHalted: false,
     isCaution: false,
-    marketCap: kisData?.marketCap || 0, 
-    high52Week: (kisData?.price || 10000) * 1.05, 
-    currentPrice: kisData?.price || 10000
+    marketCap: kisData?.marketCap || 0,
+    high52Week: kisData?.high52Week || currentPrice * 1.1,
+    currentPrice
   };
 }
 
@@ -420,10 +434,11 @@ export async function getFilteredTopStocks(): Promise<{symbol: string, name: str
         continue; 
       }
 
-      // [필터 2] 시가총액 제한 (1,000억 원 ~ 2조 원) - 가벼운 주도주 중심
-      const marketCap = detail.marketCap; 
-      if (marketCap < 100_000_000_000 || marketCap > 2_000_000_000_000) {
-        continue; 
+      // [필터 2] 시가총액 제한 (1,000억 ~ 20조) - API 실패(0)는 필터 통과
+      const marketCap = detail.marketCap;
+      if (marketCap > 0 && (marketCap < 100_000_000_000 || marketCap > 20_000_000_000_000)) {
+        console.log(`  ✗ 시총 탈락: ${detail.name} (${(marketCap / 100_000_000).toFixed(0)}억)`);
+        continue;
       }
 
       // [필터 3] 일봉상 전고점(신고가) 근접 여부 검사
@@ -445,4 +460,157 @@ export async function getFilteredTopStocks(): Promise<{symbol: string, name: str
   console.log(`🏁 [스캔 완료] 최종적으로 ${filteredStocks.length}개의 정예 주도주로 감시 풀을 구성했습니다.`);
   return filteredStocks;
 }
+
+export const getKospiStatus = async (): Promise<{
+  price: number;
+  changeRate: number;
+  isDown: boolean;
+} | null> => {
+  try {
+    const token = await getKisToken();
+    await throttleKis();
+
+    // KOSPI 지수 조회 (tr_id: FHPUP02100000, 모의투자에서 지원 안 될 수 있음)
+    const res = await axios.get(`${getURL()}/uapi/domestic-stock/v1/quotations/inquire-index-price`, {
+      headers: {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`,
+        "appkey": getAppKey(),
+        "appsecret": getAppSecret(),
+        "tr_id": "FHPUP02100000",
+        "custtype": "P"
+      },
+      params: {
+        "fid_cond_mrkt_div_code": "U",
+        "fid_input_iscd": "0001"
+      }
+    });
+
+    if (res.data.rt_cd === '0' && res.data.output) {
+      const out = res.data.output;
+      const price = parseFloat(out.bstp_nmix_prpr || "0");
+      const changeRate = parseFloat(out.prdy_ctrt || "0");
+      const sign = out.prdy_vrss_sign; // '1'=상한, '2'=상승, '3'=보합, '4'=하한, '5'=하락
+      const isDown = sign === '4' || sign === '5';
+      if (price > 0) {
+        return { price, changeRate: isDown ? -Math.abs(changeRate) : Math.abs(changeRate), isDown };
+      }
+    }
+    // 모의투자에서는 지수 조회가 안 될 수 있음 - 조용히 null 반환
+    if (getIsVts()) {
+      console.warn("[KIS] KOSPI 지수 조회 미지원 (모의투자). 지수 감시 비활성화.");
+    } else {
+      console.warn(`[KIS] KOSPI 지수 조회 실패: rt_cd=${res.data.rt_cd}, msg=${res.data.msg1}`);
+    }
+    return null;
+  } catch (err: any) {
+    console.error("[KIS API] KOSPI status error:", err.response?.data?.msg1 || err.message);
+    return null;
+  }
+};
+
+export const getKisDailyBars = async (symbol: string, nDays: number = 100): Promise<{
+  date: string; open: number; high: number; low: number; close: number; volume: number;
+}[]> => {
+  try {
+    const token = await getKisToken();
+    const today = new Date();
+    const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const startD = new Date(today);
+    startD.setDate(startD.getDate() - Math.ceil(nDays * 1.5)); // 주말/공휴일 여유
+    const startDate = startD.toISOString().slice(0, 10).replace(/-/g, '');
+
+    await throttleKis();
+    const res = await axios.get(`${getURL()}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice`, {
+      headers: {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`,
+        "appkey": getAppKey(),
+        "appsecret": getAppSecret(),
+        "tr_id": "FHKST03010100",
+        "custtype": "P"
+      },
+      params: {
+        "FID_COND_MRKT_DIV_CODE": "J",
+        "FID_INPUT_ISCD": symbol,
+        "FID_INPUT_DATE_1": startDate,
+        "FID_INPUT_DATE_2": endDate,
+        "FID_PERIOD_DIV_CODE": "D",
+        "FID_ORG_ADJ_PRC": "1"
+      }
+    });
+
+    if (res.data.rt_cd === '0' && res.data.output2 && res.data.output2.length > 0) {
+      return res.data.output2
+        .filter((b: any) => b.stck_bsop_date && parseInt(b.stck_clpr || '0') > 0)
+        .map((b: any) => ({
+          date: b.stck_bsop_date,
+          open: parseInt(b.stck_oprc || '0', 10),
+          high: parseInt(b.stck_hgpr || '0', 10),
+          low: parseInt(b.stck_lwpr || '0', 10),
+          close: parseInt(b.stck_clpr || '0', 10),
+          volume: parseInt(b.acml_vol || '0', 10),
+        }))
+        .reverse() // KIS는 최신→과거 순으로 반환, 역순으로 변환
+        .slice(-nDays);
+    }
+    return [];
+  } catch (err: any) {
+    console.error(`[KIS API] Daily bars error for ${symbol}:`, err.response?.data?.msg1 || err.message);
+    return [];
+  }
+};
+
+export const getKisMinuteBars = async (symbol: string, nBars: number = 20): Promise<{
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}[]> => {
+  try {
+    const token = await getKisToken();
+
+    const now = new Date();
+    const kstHours = now.getHours();
+    const kstMinutes = now.getMinutes();
+    const kstSeconds = now.getSeconds();
+    const inputHour = `${String(kstHours).padStart(2, '0')}${String(kstMinutes).padStart(2, '0')}${String(kstSeconds).padStart(2, '0')}`;
+
+    await throttleKis();
+    const res = await axios.get(`${getURL()}/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice`, {
+      headers: {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`,
+        "appkey": getAppKey(),
+        "appsecret": getAppSecret(),
+        "tr_id": "FHKST03010200",
+        "custtype": "P"
+      },
+      params: {
+        "fid_etc_cls_code": "",
+        "fid_cond_mrkt_div_code": "J",
+        "fid_input_iscd": symbol,
+        "fid_input_hour_1": inputHour,
+        "fid_pw_data_incu_yn": "Y"
+      }
+    });
+
+    if (res.data.rt_cd === '0' && res.data.output2 && res.data.output2.length > 0) {
+      return res.data.output2.slice(0, nBars).map((bar: any) => ({
+        time: bar.stck_cntg_hour,
+        open: parseInt(bar.stck_oprc || "0", 10),
+        high: parseInt(bar.stck_hgpr || "0", 10),
+        low: parseInt(bar.stck_lwpr || "0", 10),
+        close: parseInt(bar.stck_prpr || "0", 10),
+        volume: parseInt(bar.cntg_vol || "0", 10)
+      }));
+    }
+    return [];
+  } catch (err: any) {
+    console.error(`[KIS API] Minute bars error for ${symbol}:`, err.response?.data?.msg1 || err.message);
+    return [];
+  }
+};
 

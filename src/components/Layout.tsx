@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { LayoutGrid, TrendingUp, Wallet, History, Search, Activity, LogOut } from 'lucide-react';
+import { LayoutGrid, TrendingUp, Wallet, History, Search, Activity, LogOut, BarChart2 } from 'lucide-react';
 import { auth } from '../lib/firebase.ts';
 
 interface LayoutProps {
@@ -12,9 +12,10 @@ interface LayoutProps {
   totalEquity?: number;
   apiStatus?: string;
   userEmail?: string | null;
+  isRunning?: boolean;
 }
 
-export default function DashboardLayout({ children, activeTab, setActiveTab, capital, reserve, totalEquity, apiStatus, userEmail }: LayoutProps) {
+export default function DashboardLayout({ children, activeTab, setActiveTab, capital, reserve, totalEquity, apiStatus, userEmail, isRunning }: LayoutProps) {
   const navItems = [
     { id: 'explore', icon: Activity, label: '시장 (Market)' },
     { id: 'portfolio', icon: Wallet, label: '포트폴리오 (Portfolio)' },
@@ -22,6 +23,7 @@ export default function DashboardLayout({ children, activeTab, setActiveTab, cap
     { id: 'search', icon: Search, label: '검색 (Search)' },
     { id: 'log', icon: LayoutGrid, label: '로그 (Log)' },
     { id: 'backtest', icon: TrendingUp, label: '백테스트 (Backtest)' },
+    { id: 'stats', icon: BarChart2, label: '전략통계 (Stats)' },
   ];
 
   const handleLogout = () => {
@@ -45,13 +47,19 @@ export default function DashboardLayout({ children, activeTab, setActiveTab, cap
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-4 px-8 py-4 transition-colors font-mono uppercase text-xs tracking-widest ${
-                activeTab === item.id 
-                  ? 'bg-gray-900 text-white' 
+                activeTab === item.id
+                  ? 'bg-gray-900 text-white'
                   : 'hover:bg-gray-900/5'
               }`}
             >
               <item.icon size={18} />
               {item.label}
+              {item.id === 'explore' && isRunning && (
+                <span className="ml-auto relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -121,13 +129,21 @@ export default function DashboardLayout({ children, activeTab, setActiveTab, cap
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-sm transition-colors ${
-              activeTab === item.id 
-                ? 'bg-gray-900 text-white' 
+            className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-sm transition-colors relative ${
+              activeTab === item.id
+                ? 'bg-gray-900 text-white'
                 : 'text-gray-900 hover:bg-gray-900/10'
             }`}
           >
-            <item.icon size={18} />
+            <div className="relative">
+              <item.icon size={18} />
+              {item.id === 'explore' && isRunning && (
+                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+              )}
+            </div>
             <span className="text-[9px] font-mono uppercase tracking-tighter truncate w-full text-center px-1">
               {item.label.split(' ')[0]}
             </span>

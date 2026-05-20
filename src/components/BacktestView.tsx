@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Target, Activity, Settings2 } from 'lucide-react';
 import StockChart from './StockChart.tsx';
 import { ChartData } from '../types.ts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export default function BacktestView() {
   const [symbol, setSymbol] = useState('005930');
@@ -171,6 +172,67 @@ export default function BacktestView() {
                   </div>
                   <div className="h-full border border-gray-100 bg-gray-50/50 pt-4">
                     <StockChart data={chartData} />
+                  </div>
+                </div>
+              )}
+
+              {result.strategyBreakdown && result.strategyBreakdown.length > 0 && (
+                <div className="mb-8">
+                  <h4 className="font-bold text-lg mb-4 font-mono border-b border-gray-100 pb-2">전략별 성과 분석</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="h-48">
+                      <div className="text-xs text-gray-500 mb-1">전략별 승률 (%)</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={result.strategyBreakdown} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                          <Tooltip formatter={(v: any) => [`${v}%`, '승률']} />
+                          <Bar dataKey="winRate" radius={[3, 3, 0, 0]}>
+                            {result.strategyBreakdown.map((entry: any, i: number) => (
+                              <Cell key={i} fill={entry.winRate >= 50 ? '#16a34a' : '#dc2626'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="h-48">
+                      <div className="text-xs text-gray-500 mb-1">전략별 평균 수익률 (%)</div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={result.strategyBreakdown} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
+                          <Tooltip formatter={(v: any) => [`${v}%`, '평균 수익']} />
+                          <Bar dataKey="avgProfitPct" radius={[3, 3, 0, 0]}>
+                            {result.strategyBreakdown.map((entry: any, i: number) => (
+                              <Cell key={i} fill={entry.avgProfitPct >= 0 ? '#2563eb' : '#dc2626'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs font-mono border border-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          {['전략', '총거래', '승', '패', '승률', '평균수익'].map(h => (
+                            <th key={h} className="px-3 py-2 text-left border-b border-gray-200">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.strategyBreakdown.map((s: any, i: number) => (
+                          <tr key={i} className="hover:bg-gray-50 border-b border-gray-100">
+                            <td className="px-3 py-2 font-bold">{s.name}</td>
+                            <td className="px-3 py-2">{s.total}</td>
+                            <td className="px-3 py-2 text-green-600">{s.wins}</td>
+                            <td className="px-3 py-2 text-red-600">{s.losses}</td>
+                            <td className={`px-3 py-2 font-bold ${s.winRate >= 50 ? 'text-green-600' : 'text-red-600'}`}>{s.winRate}%</td>
+                            <td className={`px-3 py-2 font-bold ${s.avgProfitPct >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{s.avgProfitPct > 0 ? '+' : ''}{s.avgProfitPct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}

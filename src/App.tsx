@@ -9,6 +9,7 @@ import { auth } from './lib/firebase.ts';
 import DashboardLayout from './components/Layout.tsx';
 import StockChart from './components/StockChart.tsx';
 import BacktestView from './components/BacktestView.tsx';
+import StrategyStats from './components/StrategyStats.tsx';
 import LoginForm from './components/LoginForm.tsx';
 import { StockQuote, ChartData } from './types.ts';
 import { TrendingUp, TrendingDown, Target, BrainCircuit, Activity, History, Shield } from 'lucide-react';
@@ -29,7 +30,7 @@ export default function App() {
       let key = '';
       if (period === 'W') {
          const jan1 = new Date(d.getFullYear(), 0, 1);
-         const week = Math.ceil((((d.getTime() - jan1.getTime()) / 86400000) + jan1.getDay() + 1) / 7);
+         const week = Math.floor((d.getTime() - jan1.getTime()) / (86400000 * 7)) + 1;
          key = `${d.getFullYear()}-W${week}`;
       } else if (period === 'M') {
          key = `${d.getFullYear()}-${d.getMonth()}`;
@@ -109,7 +110,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
   const [botConfig, setBotConfig] = useState({ 
-    symbol: '005930', price: 290000, qty: 1, profitTarget: 0.03, lossLimits: -0.05, useAI: true 
+    symbol: '005930', price: 290000, qty: 1, profitTarget: 0.03, lossLimits: -0.03, useAI: true 
   });
 
   // 봇 상태 주기적 업데이트 (1초마다)
@@ -126,7 +127,7 @@ export default function App() {
              price: data.targetPrice,
              qty: data.tradeQty,
              profitTarget: data.profitTarget || 0.03,
-             lossLimits: data.lossLimits || -0.05,
+             lossLimits: data.lossLimits ?? -0.03,
              useAI: data.useAI ?? true
            });
         }
@@ -267,14 +268,15 @@ export default function App() {
   }
 
   return (
-    <DashboardLayout 
-      activeTab={activeTab} 
+    <DashboardLayout
+      activeTab={activeTab}
       setActiveTab={setActiveTab}
       capital={botState.capital}
       reserve={botState.reserve}
       totalEquity={totalEquity}
       apiStatus={apiStatus}
       userEmail={authUser?.email}
+      isRunning={botState.isRunning}
     >
       {(() => {
         const lastError = botState.logs?.find(log => log.includes('에러') || log.includes('실패') || log.includes('Error') || log.includes('❌') || log.includes('⚠️'));
@@ -436,26 +438,63 @@ export default function App() {
           </section>
 
           <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {/* 승률 (실제 journal 데이터 기반) */}
+            {(() => {
+              const journals = botState.journals || [];
+              const wins = journals.filter(j => j.profitRate > 0).length;
+              const winRate = journals.length ? Math.round(wins / journals.length * 100) : null;
+              const totalPnl = journals.reduce((s, j) => s + (j.profitAmount || 0), 0);
+              return (
+                <div className="border border-gray-200 rounded-xl shadow-sm p-6 bg-white">
+                  <div className="flex items-center gap-3 mb-3 opacity-70">
+                    <Target size={18} />
+                    <span className="font-mono text-xs uppercase">승률 (Win Rate)</span>
+                  </div>
+                  <div className={`text-3xl font-bold ${winRate !== null ? (winRate >= 50 ? 'text-green-600' : 'text-red-600') : ''}`}>
+                    {winRate !== null ? `${winRate}%` : '─'}
+                  </div>
+                  <div className="text-xs font-mono opacity-50 mt-1.5">
+                    {journals.length}번 거래 · 누적 {totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()}원
+                  </div>
+                </div>
+              );
+            })()}
+            {/* 오늘 거래 (실제 orders 데이터) */}
+            {(() => {
+              const now = new Date();
+              const todayOrders = (botState.orders || []).filter(o => {
+                const d = new Date(o.timestamp);
+                return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+              });
+              const todayBuys = todayOrders.filter(o => o.type === 'BUY').length;
+              const todaySells = todayOrders.filter(o => o.type === 'SELL').length;
+              const todayPnl = todayOrders.filter(o => o.type === 'SELL').reduce((s, o) => s + (o.profitAmount || 0), 0);
+              return (
+                <div className="border border-gray-200 rounded-xl shadow-sm p-6 bg-white">
+                  <div className="flex items-center gap-3 mb-3 opacity-70">
+                    <Activity size={18} />
+                    <span className="font-mono text-xs uppercase">오늘 거래 (Today)</span>
+                  </div>
+                  <div className="text-3xl font-bold">{todayOrders.length}<span className="text-base font-mono opacity-40 ml-1">건</span></div>
+                  <div className={`text-xs font-mono mt-1.5 ${todayPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    매수 {todayBuys} · 매도 {todaySells} &nbsp;|&nbsp; {todayPnl >= 0 ? '+' : ''}{todayPnl.toLocaleString()}원
+                  </div>
+                </div>
+              );
+            })()}
+            {/* AI 분석 스코어 */}
             <div className="border border-gray-200 rounded-xl shadow-sm p-6 bg-white">
-              <div className="flex items-center gap-3 mb-4 opacity-70">
-                <Activity size={18} />
-                <span className="font-mono text-xs uppercase">거시 지표 (Volatility)</span>
-              </div>
-              <div className="text-2xl font-bold">Medium</div>
-            </div>
-            <div className="border border-gray-200 rounded-xl shadow-sm p-6 bg-white">
-              <div className="flex items-center gap-3 mb-4 opacity-70">
-                <Target size={18} />
-                <span className="font-mono text-xs uppercase">RSI (14)</span>
-              </div>
-              <div className="text-2xl font-bold">58.4</div>
-            </div>
-            <div className="border border-gray-200 rounded-xl shadow-sm p-6 bg-white">
-              <div className="flex items-center gap-3 mb-4 opacity-70">
+              <div className="flex items-center gap-3 mb-3 opacity-70">
                 <BrainCircuit size={18} />
-                <span className="font-mono text-xs uppercase">AI Score</span>
+                <span className="font-mono text-xs uppercase">AI 분석 스코어</span>
               </div>
-              <div className="text-2xl font-bold">{analysis?.confidence ? (analysis.confidence / 10).toFixed(1) : '-'} / 10</div>
+              <div className="text-3xl font-bold">
+                {analysis?.confidence ? analysis.confidence : '─'}
+                <span className="text-base font-mono opacity-40 ml-1">/100</span>
+              </div>
+              <div className="text-xs font-mono opacity-50 mt-1.5">
+                {analysis ? (analysis.recommendation === 'SELL' ? '⚠️ 매도 시그널' : '🛡️ 홀딩 / 매수 중립') : '분석 대기 중'}
+              </div>
             </div>
           </section>
         </div>
@@ -967,18 +1006,29 @@ export default function App() {
       {activeTab === 'log' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
            <h2 className="text-3xl font-serif italic mb-6">시스템 로그 (Logs)</h2>
-           <div className="border border-gray-200 rounded-xl shadow-sm bg-gray-900 text-[#80ff80] p-6 min-h-[500px] font-mono text-sm shadow-xl overflow-y-auto h-[600px] md:h-[700px] custom-scrollbar">
+           <div className="border border-gray-200 rounded-xl shadow-sm bg-gray-900 p-6 min-h-[500px] font-mono text-xs shadow-xl overflow-y-auto h-[600px] md:h-[700px] custom-scrollbar">
               {botState.logs && botState.logs.length > 0 ? (
-                 botState.logs.map((log, idx) => (
-                    <div key={idx} className="mb-2 pb-2 border-b border-[#E4E3E0]/10 last:border-0 hover:bg-[#E4E3E0]/5 px-2 -mx-2">{log}</div>
-                 ))
+                 botState.logs.map((log, idx) => {
+                   const isError = /❌|에러|Error|\[CRITICAL\]|실패/.test(log);
+                   const isWarn = /⚠️|쿼터|타임아웃|Rate Limit/.test(log);
+                   const isBuy = /매수 체결|BUY/.test(log);
+                   const isSell = /매도 체결|SELL|익절|손절|청산|타임컷/.test(log);
+                   const isAI = /Gemini|AI/.test(log);
+                   const color = isError ? 'text-red-400' : isWarn ? 'text-yellow-400' : isBuy ? 'text-sky-300' : isSell ? 'text-orange-300' : isAI ? 'text-purple-300' : 'text-green-400';
+                   return (
+                     <div key={idx} className={`mb-1.5 pb-1.5 border-b border-white/5 last:border-0 px-2 -mx-2 leading-relaxed ${color}`}>
+                       {log}
+                     </div>
+                   );
+                 })
               ) : (
-                <div className="opacity-50 italic">기록된 로그가 없습니다. (System is quiet)</div>
+                <div className="text-green-400/40 italic">기록된 로그가 없습니다. (System is quiet)</div>
               )}
            </div>
         </div>
       )}
       {activeTab === 'backtest' && <BacktestView />}
+      {activeTab === 'stats' && <StrategyStats />}
       {selectedJournal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedJournal(null)}>
           <div className="bg-white border-2 border-black w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>

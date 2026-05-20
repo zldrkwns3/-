@@ -22,14 +22,27 @@ service cloud.firestore {
     // System Bot Asset History
     match /bot_history/{dateId} {
       function isValidSnapshot(data) {
-        return data.date is string 
-          && data.totalEquity is number 
-          && data.operationPool is number 
+        return data.date is string
+          && data.totalEquity is number
+          && data.operationPool is number
           && data.safeVault is number;
       }
 
-      allow read: if true; 
+      allow read: if true;
       allow create, update: if isValidSnapshot(request.resource.data);
+    }
+
+    // Bot Trade Records (서버에서 직접 기록)
+    match /trades/{tradeId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.symbol is string
+        && request.resource.data.buyPrice is number
+        && request.resource.data.sellPrice is number;
+    }
+
+    // Bot Config (교훈 학습 데이터 등)
+    match /bot_config/{docId} {
+      allow read, write: if true;
     }
 
     // User Profile Rules
