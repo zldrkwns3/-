@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user account information and virtual balance.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "balance": { "type": "number", "description": "Virtual currency balance for trading." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "balance"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "Represents a stock held by the user.",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string" },
+        "quantity": { "type": "number" },
+        "averageBuyPrice": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["symbol", "quantity", "averageBuyPrice"]
+    },
+    "Trade": {
+      "title": "Trade History",
+      "description": "A record of a buy or sell transaction.",
+      "type": "object",
+      "properties": {
+        "symbol": { "type": "string" },
+        "type": { "type": "string", "enum": ["BUY", "SELL"] },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["symbol", "type", "quantity", "price", "timestamp"]
+    },
+    "AssetSnapshot": {
+      "title": "Asset Snapshot",
+      "description": "Daily snapshot of user equity & balances.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "totalEquity": { "type": "number" },
+        "operationPool": { "type": "number" },
+        "safeVault": { "type": "number" }
+      },
+      "required": ["date", "totalEquity", "operationPool", "safeVault"]
+    }
+  },
+  "firestore": {
+    "bot_history/{date}": {
+      "schema": "AssetSnapshot",
+      "description": "Global daily snapshots of the bot's asset status."
+    },
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Primary user document."
+    },
+    "users/{userId}/portfolio/{symbol}": {
+      "schema": "PortfolioItem",
+      "description": "User's current stock holdings."
+    },
+    "users/{userId}/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "User's transaction history."
+    }
+  }
+}

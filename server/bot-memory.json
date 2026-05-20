@@ -1,0 +1,245 @@
+{
+  "watchList": [
+    [
+      "373220",
+      {
+        "symbol": "373220",
+        "name": "LG에너지솔루션",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "000270",
+      {
+        "symbol": "000270",
+        "name": "기아",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "068270",
+      {
+        "symbol": "068270",
+        "name": "셀트리온",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "051910",
+      {
+        "symbol": "051910",
+        "name": "LG화학",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "005490",
+      {
+        "symbol": "005490",
+        "name": "POSCO홀딩스",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "006400",
+      {
+        "symbol": "006400",
+        "name": "삼성SDI",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "012330",
+      {
+        "symbol": "012330",
+        "name": "현대모비스",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "105560",
+      {
+        "symbol": "105560",
+        "name": "KB금융",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "055550",
+      {
+        "symbol": "055550",
+        "name": "신한지주",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "032830",
+      {
+        "symbol": "032830",
+        "name": "삼성생명",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "003670",
+      {
+        "symbol": "003670",
+        "name": "포스코퓨처엠",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "033780",
+      {
+        "symbol": "033780",
+        "name": "KT&G",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ],
+    [
+      "011200",
+      {
+        "symbol": "011200",
+        "name": "HMM",
+        "investAmount": 1000000,
+        "takeProfitPct": 0.03,
+        "stopLossPct": -0.05,
+        "useAI": true
+      }
+    ]
+  ],
+  "positions": [
+    [
+      "032830",
+      {
+        "symbol": "032830",
+        "name": "삼성생명",
+        "qty": 3,
+        "buyPrice": 316500,
+        "currentPrice": 313500,
+        "profitRate": -0.0095,
+        "highestPrice": 318000
+      }
+    ],
+    [
+      "055550",
+      {
+        "symbol": "055550",
+        "name": "신한지주",
+        "qty": 10,
+        "buyPrice": 95025,
+        "currentPrice": 93100,
+        "profitRate": -0.0203,
+        "highestPrice": 94800
+      }
+    ],
+    [
+      "373220",
+      {
+        "symbol": "373220",
+        "name": "LG에너지솔루션",
+        "qty": 2,
+        "buyPrice": 400750,
+        "currentPrice": 408000,
+        "profitRate": 0.0181,
+        "highestPrice": 405000
+      }
+    ],
+    [
+      "033780",
+      {
+        "symbol": "033780",
+        "name": "KT&G",
+        "buyPrice": 177300,
+        "qty": 5,
+        "totalInvested": 888000,
+        "buyTime": 1779151488825,
+        "highestPrice": 177700
+      }
+    ]
+  ],
+  "availableCapital": 6372469,
+  "safeReserve": 2900,
+  "totalEquity": 9937369,
+  "journals": [
+    {
+      "symbol": "068270",
+      "name": "셀트리온",
+      "qty": 5,
+      "buyPrice": 181100,
+      "sellPrice": 184000,
+      "profitRate": 0.01601325234676974,
+      "profitAmount": 14500,
+      "review": "1.60%의 양(+)의 수익률을 기록하여 가격 변동 포착 능력은 긍정적입니다. 다만, '손실/타임컷' 처리된 것으로 보아 설정된 시간 안에 기대했던 순수익 목표를 달성하지 못했거나, 거래 비용(수수료, 세금)을 감안한 실제 수익이 목표치에 미치지 못했을 가능성이 큽니다.\n\n다음 거래에서는 시장의 움직임과 거래 비용을 종합적으로 고려하여 **목표 수익률과 포지션 보유 시간 전략을 재조정**해 보세요.",
+      "date": 1779151435644
+    }
+  ],
+  "orders": [
+    {
+      "symbol": "033780",
+      "name": "KT&G",
+      "type": "BUY",
+      "price": 177600,
+      "qty": 5,
+      "amount": 888000,
+      "timestamp": 1779151488825,
+      "status": "SUCCESS",
+      "message": "🛡️ 중반장: VWAP 및 보조지표 눌림목 지지"
+    },
+    {
+      "symbol": "068270",
+      "name": "셀트리온",
+      "type": "SELL",
+      "price": 184000,
+      "qty": 5,
+      "amount": 920000,
+      "timestamp": 1779151422108,
+      "status": "SUCCESS",
+      "message": "AI Decision"
+    }
+  ],
+  "history": [
+    {
+      "date": "2026-05-19",
+      "totalEquity": 9955619,
+      "operationPool": 6375369,
+      "safeVault": 0
+    }
+  ]
+}

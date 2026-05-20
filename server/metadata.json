@@ -1,0 +1,8 @@
+{
+  "name": "StockBot AI",
+  "description": "AI-powered stock trading simulator and monitoring dashboard with technical analysis and Gemini-driven insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
