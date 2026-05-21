@@ -934,32 +934,17 @@ async function fetchDailyBars(symbol: string, currentPrice: number): Promise<any
     return bars;
   }
 
-  // KIS 일봉 우선 시도
+  // KIS 일봉 조회 (한국 주식 단일 소스)
   const kisBars = await getKisDailyBars(symbol, 120);
   if (kisBars.length >= 30) {
     const quotes = kisBars.map(b => ({ open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume }));
     dailyBarCache.set(symbol, { bars: quotes, updatedAt: Date.now() });
-    // 마지막 바를 현재가로 갱신
     quotes[quotes.length - 1] = { ...quotes[quotes.length - 1], close: currentPrice };
     return quotes;
   }
 
-  // Yahoo Finance 폴백
-  const yfSymbol = `${symbol}.KS`;
-  const start = new Date();
-  start.setDate(start.getDate() - 150);
-  const chart: any = await Promise.race([
-    yahooFinance.chart(yfSymbol, { period1: start, period2: new Date(), interval: "1d" }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Yahoo Finance Timeout")), 8000))
-  ]);
-  if (chart?.quotes?.length > 26) {
-    const quotes = chart.quotes
-      .filter((q: any) => q.close !== null && q.high !== null && q.low !== null)
-      .map((q: any) => ({ open: q.open || q.close, high: q.high, low: q.low, close: q.close, volume: q.volume || 1 }));
-    dailyBarCache.set(symbol, { bars: quotes, updatedAt: Date.now() });
-    quotes[quotes.length - 1] = { ...quotes[quotes.length - 1], close: currentPrice };
-    return quotes;
-  }
+  // KIS 실패 시 빈 배열 반환 (호출부에서 isFallback 처리)
+  console.warn(`[fetchDailyBars] ${symbol}: KIS 일봉 ${kisBars.length}개 반환 (30개 미만 → 지표 계산 불가)`);
   return [];
 }
 
@@ -1504,19 +1489,11 @@ async function monitoringLoop() {
         // [상황 B] 미보유 종목 타점 감시
         const indicators = await getTechnicalIndicators(symbol, currentPrice);
 
-        // 지표 fallback(데이터 없음) → 연속 실패 카운트, 3회 이상 시 watchList 자동 제거
+        // 지표 fallback(KIS 일봉 데이터 부족) → 매수 신호 건너뜀, watchList는 유지
         if (indicators.isFallback) {
           const fails = (indicatorFailCount.get(symbol) ?? 0) + 1;
           indicatorFailCount.set(symbol, fails);
-          if (fails >= 3) {
-            memory.watchList.delete(symbol);
-            indicatorFailCount.delete(symbol);
-            dailyBarCache.delete(symbol);
-            memory.save();
-            addBotLog(`🗑️ [자동 제거] ${symbol} — 3회 연속 지표 수집 실패로 감시 목록에서 제거됨 (상장폐지/거래정지 의심)`);
-            continue;
-          }
-          addBotLog(`⏭️ [지표 없음] ${symbol} — 유효 데이터 없음, 이번 루프 건너뜀 (${fails}/3회)`);
+          addBotLog(`⏭️ [지표 없음] ${symbol} — KIS 일봉 데이터 부족, 매수 신호 스킵 (누적 ${fails}회)`);
           continue;
         }
         indicatorFailCount.delete(symbol); // 성공 시 실패 카운트 초기화

@@ -554,6 +554,8 @@ export const getKisDailyBars = async (symbol: string, nDays: number = 100): Prom
         .reverse() // KIS는 최신→과거 순으로 반환, 역순으로 변환
         .slice(-nDays);
     }
+    // KIS 응답 실패 — rt_cd와 메시지 출력해서 원인 진단
+    console.warn(`[KIS Daily] ${symbol} 실패: rt_cd=${res.data.rt_cd}, msg="${res.data.msg1}", output2길이=${res.data.output2?.length ?? 'undefined'}`);
     return [];
   } catch (err: any) {
     console.error(`[KIS API] Daily bars error for ${symbol}:`, err.response?.data?.msg1 || err.message);
