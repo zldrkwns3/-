@@ -377,16 +377,47 @@ async function fetchTop100ByVolume(): Promise<{symbol: string}[]> {
   } catch (e: any) {
     console.error("Top volume API error:", e.response?.data?.msg1 || e.message);
   }
-  // 실패 시 시총 1천억~2조 중형주 폴백 (대형주 사용 시 시총 필터 전부 탈락)
-  console.warn("⚠️ [폴백] 거래량 순위 API 실패 → 중형주 기본 풀 사용");
+  // 실패 시 대형/중형주 혼합 폴백 (100개) — VTS에서 거래량 순위 API 미지원 시 사용
+  console.warn("⚠️ [폴백] 거래량 순위 API 실패 → 기본 풀 사용");
   return [
-    { symbol: "011200" }, { symbol: "000860" }, { symbol: "034020" },
+    // 대형주 (코스피 시총 상위)
+    { symbol: "005930" }, { symbol: "000660" }, { symbol: "035420" },
+    { symbol: "005380" }, { symbol: "051910" }, { symbol: "006400" },
+    { symbol: "035720" }, { symbol: "000270" }, { symbol: "096770" },
+    { symbol: "003550" }, { symbol: "017670" }, { symbol: "030200" },
+    { symbol: "032830" }, { symbol: "066570" }, { symbol: "086790" },
+    { symbol: "010130" }, { symbol: "018260" }, { symbol: "012330" },
+    { symbol: "011200" }, { symbol: "028260" }, { symbol: "009150" },
+    { symbol: "024110" }, { symbol: "000810" }, { symbol: "034020" },
+    { symbol: "015760" }, { symbol: "010140" }, { symbol: "011070" },
+    // 중형주 (코스피/코스닥 성장주)
     { symbol: "047040" }, { symbol: "073240" }, { symbol: "088790" },
     { symbol: "064350" }, { symbol: "054000" }, { symbol: "030000" },
     { symbol: "034120" }, { symbol: "105630" }, { symbol: "001230" },
     { symbol: "024720" }, { symbol: "006360" }, { symbol: "038530" },
     { symbol: "025620" }, { symbol: "204320" }, { symbol: "060980" },
-    { symbol: "003410" }, { symbol: "095570" },
+    { symbol: "003410" }, { symbol: "095570" }, { symbol: "000860" },
+    { symbol: "004020" }, { symbol: "010620" }, { symbol: "011780" },
+    { symbol: "001750" }, { symbol: "002380" }, { symbol: "004990" },
+    { symbol: "005180" }, { symbol: "006800" }, { symbol: "007160" },
+    { symbol: "008350" }, { symbol: "009830" }, { symbol: "010780" },
+    { symbol: "011150" }, { symbol: "012750" }, { symbol: "013890" },
+    { symbol: "014130" }, { symbol: "016360" }, { symbol: "017800" },
+    { symbol: "018880" }, { symbol: "019540" }, { symbol: "020560" },
+    { symbol: "021240" }, { symbol: "023530" }, { symbol: "024990" },
+    { symbol: "027740" }, { symbol: "028300" }, { symbol: "029460" },
+    { symbol: "031430" }, { symbol: "032280" }, { symbol: "033270" },
+    { symbol: "036570" }, { symbol: "037560" }, { symbol: "039130" },
+    { symbol: "040300" }, { symbol: "041510" }, { symbol: "042660" },
+    { symbol: "044580" }, { symbol: "047050" }, { symbol: "049770" },
+    { symbol: "051600" }, { symbol: "052690" }, { symbol: "053450" },
+    { symbol: "055550" }, { symbol: "057050" }, { symbol: "058430" },
+    { symbol: "060310" }, { symbol: "061040" }, { symbol: "063080" },
+    { symbol: "065500" }, { symbol: "068270" }, { symbol: "069960" },
+    { symbol: "071050" }, { symbol: "072130" }, { symbol: "078930" },
+    { symbol: "086280" }, { symbol: "089590" }, { symbol: "091990" },
+    { symbol: "093050" }, { symbol: "097950" }, { symbol: "102280" },
+    { symbol: "111770" }, { symbol: "115390" }, { symbol: "128940" },
   ];
 }
 
@@ -441,11 +472,12 @@ export async function getFilteredTopStocks(): Promise<{symbol: string, name: str
         continue;
       }
 
-      // [필터 3] 일봉상 전고점(신고가) 근접 여부 검사
+      // [필터 3] 52주 신고가 대비 70% 이상 (너무 눌린 종목 제외)
       const high52w = detail.high52Week;
       const priceRatio = detail.currentPrice / high52w;
-      if (priceRatio < 0.90) {
-        continue; 
+      if (priceRatio < 0.70) {
+        console.log(`  ✗ 전고점 탈락: ${detail.name} (${(priceRatio * 100).toFixed(1)}%)`);
+        continue;
       }
 
       filteredStocks.push({symbol: stock.symbol, name: detail.name});

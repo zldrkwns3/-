@@ -1821,11 +1821,12 @@ cron.schedule("0 */10 * * * *", () => {
   }
 });
 
-// 5분마다 watchList 자동 복구 (감시 풀이 비어있으면 재탐색)
+// 5분마다 watchList 자동 복구 (감시 풀이 5개 미만이면 재탐색)
+const MIN_WATCHLIST_SIZE = 5;
 let isRefreshingWatchList = false;
 cron.schedule("0 */5 * * * *", async () => {
   if (!memory.isRunning) return;
-  if (memory.watchList.size > 0) return; // 이미 감시 종목 있으면 패스
+  if (memory.watchList.size >= MIN_WATCHLIST_SIZE) return; // 충분히 있으면 패스
   if (isRefreshingWatchList) return;
   if (!isKoreanMarketOpenStrict()) return;
 
