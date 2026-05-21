@@ -921,6 +921,8 @@ ${summary}
 
 // 일봉 데이터 캐시 (30분 TTL — 장중 30초마다 재호출 방지)
 const dailyBarCache: Map<string, { bars: any[]; updatedAt: number }> = new Map();
+// 지표 실패 카운터: 3회 연속 실패 시 watchList에서 자동 제거
+const indicatorFailCount: Map<string, number> = new Map();
 const DAILY_CACHE_TTL = 30 * 60 * 1000;
 
 async function fetchDailyBars(symbol: string, currentPrice: number): Promise<any[]> {
@@ -1173,6 +1175,7 @@ async function getTechnicalIndicators(symbol: string, currentPrice: number) {
         squeezeFiring,
         sqMomVal,
         sqMomPrev,
+        isFallback: false,
       };
     }
   } catch (e: any) {
@@ -1180,8 +1183,9 @@ async function getTechnicalIndicators(symbol: string, currentPrice: number) {
     addBotLog(`⚠️ [지표 오류] ${symbol} 데이터 수집 실패 (${e.message})`);
   }
 
-  // 실패 시 기본 데이터
+  // 실패 시 기본 데이터 (isFallback=true → monitoringLoop에서 연속 실패 카운트)
   return {
+    isFallback: true,
     currentPrice,
     openPrice: currentPrice,
     ma5: currentPrice,
@@ -1499,6 +1503,24 @@ async function monitoringLoop() {
       else {
         // [상황 B] 미보유 종목 타점 감시
         const indicators = await getTechnicalIndicators(symbol, currentPrice);
+
+        // 지표 fallback(데이터 없음) → 연속 실패 카운트, 3회 이상 시 watchList 자동 제거
+        if (indicators.isFallback) {
+          const fails = (indicatorFailCount.get(symbol) ?? 0) + 1;
+          indicatorFailCount.set(symbol, fails);
+          if (fails >= 3) {
+            memory.watchList.delete(symbol);
+            indicatorFailCount.delete(symbol);
+            dailyBarCache.delete(symbol);
+            memory.save();
+            addBotLog(`🗑️ [자동 제거] ${symbol} — 3회 연속 지표 수집 실패로 감시 목록에서 제거됨 (상장폐지/거래정지 의심)`);
+            continue;
+          }
+          addBotLog(`⏭️ [지표 없음] ${symbol} — 유효 데이터 없음, 이번 루프 건너뜀 (${fails}/3회)`);
+          continue;
+        }
+        indicatorFailCount.delete(symbol); // 성공 시 실패 카운트 초기화
+
         const { openPrice, ma5, ma20, rsi, bbLower } = indicators;
         
         let strategyMatched = false;
